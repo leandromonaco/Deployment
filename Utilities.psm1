@@ -66,33 +66,33 @@ Function Backup-File
     Show-SuccessMessage "Backup file has been created: $BackupFile"
 }
 
-Function Rollback-File
-{
-    Param ([parameter(Mandatory=$true)][string]$FileToRestore,
-           [parameter(Mandatory=$true)][string]$BackupName,
-           [parameter(Mandatory=$true)][string]$BackupFolder)
+#Function Rollback-File
+#{
+#    Param ([parameter(Mandatory=$true)][string]$FileToRestore,
+#           [parameter(Mandatory=$true)][string]$BackupName,
+#           [parameter(Mandatory=$true)][string]$BackupFolder)
 
-    #Search for all the backup files using $BackupName
-    $SearchTerm =  "$BackupName*.bak"
-    $FirstBackupFile = Get-Childitem –Path $BackupFolder -Include $SearchTerm -File -Recurse | Select-Object -First 1
+#    #Search for all the backup files using $BackupName
+#    $SearchTerm =  "$BackupName*.bak"
+#    $FirstBackupFile = Get-Childitem –Path $BackupFolder -Include $SearchTerm -File -Recurse | Select-Object -First 1
 
-    #Is there any backup?
-    if(($FirstBackupFile.count -gt 0) -and (Test-Path $FirstBackupFile[0]))
-    {
-        #Yes - Restore the latest backup file
-        Show-SuccessMessage "Restoring the latest backup file: $FirstBackupFile";
+#    #Is there any backup?
+#    if(($FirstBackupFile.count -gt 0) -and (Test-Path $FirstBackupFile[0]))
+#    {
+#        #Yes - Restore the latest backup file
+#        Show-SuccessMessage "Restoring the latest backup file: $FirstBackupFile";
 
-        Copy-Item $FirstBackupFile[0] $FileToRestore
+#        Copy-Item $FirstBackupFile[0] $FileToRestore
 
-        Show-SuccessMessage "Restore successful: $FirstBackupFile"
-    }
-    else
-    {
-        #No - There is no backup file to restore
-        Show-ErrorMessage "$BackupName was not found."
-    }
-    exit
-}
+#        Show-SuccessMessage "Restore successful: $FirstBackupFile"
+#    }
+#    else
+#    {
+#        #No - There is no backup file to restore
+#        Show-ErrorMessage "$BackupName was not found."
+#    }
+#    exit
+#}
 
 Function Change-AttributeValue
 {
@@ -197,87 +197,68 @@ Function Save-XmlFile
     Show-SuccessMessage "File saved successfully $XmlLocation"
 }
 
-Function Replace-Files
-{
-    param(
-            [string] $PatchFolder = $Global:CurrentLocation + "\Patch",
-            [string] $BackupFolder = $Global:BackupFolder,
-            [parameter(Mandatory=$true)][string] $TargetFolder = "",
-            [string] $TargetFiles = "*.*"
-         )
+#Function Replace-Files
+#{
+#    param(
+#            [string] $PatchFolder = $Global:CurrentLocation + "\Patch",
+#            [string] $BackupFolder = $Global:BackupFolder,
+#            [parameter(Mandatory=$true)][string] $TargetFolder = "",
+#            [string] $TargetFiles = "*.*"
+#         )
 
-    #Validate TargetFolder
-    if(-not (Test-Path $TargetFolder))
-    {
-        Show-ErrorMessage "Target folder does not exist"
-        exit
-    }
+#    #Validate TargetFolder
+#    if(-not (Test-Path $TargetFolder))
+#    {
+#        Show-ErrorMessage "Target folder does not exist"
+#        exit
+#    }
 
-    if(-Not (Test-Path $BackupFolder))
-    {
-        New-Item $BackupFolder -type directory
-    }
+#    if(-Not (Test-Path $BackupFolder))
+#    {
+#        New-Item $BackupFolder -type directory
+#    }
 
-    #Get all the files
-    $FilesInTargetFolder = Get-ChildItem -Path $TargetFolder -Filter $TargetFiles -Recurse -Force
-    $FilesInPatchFolder = Get-ChildItem -Path $PatchFolder -Filter $TargetFiles -Recurse -Force
+#    #Get all the files
+#    $FilesInTargetFolder = Get-ChildItem -Path $TargetFolder -Filter $TargetFiles -Recurse -Force
+#    $FilesInPatchFolder = Get-ChildItem -Path $PatchFolder -Filter $TargetFiles -Recurse -Force
 
-    foreach ($FileInPatchFolder in $FilesInPatchFolder) 
-    {
-        foreach ($FileInTargetFolder in $FilesInTargetFolder) 
-        {
-            #If it's not a directory
-            if($FileInTargetFolder.Attributes -ne ‘Directory’)
-            {
-                #If the file to replace if found
-                if($FileInTargetFolder.Name -eq $FileInPatchFolder.Name)
-                {
-                    #Create Backup Subfolder
-                    $BackupSubfolder = $BackupFolder + $FileInTargetFolder.Directory.FullName.Replace($TargetFolder, "")
+#    foreach ($FileInPatchFolder in $FilesInPatchFolder) 
+#    {
+#        foreach ($FileInTargetFolder in $FilesInTargetFolder) 
+#        {
+#            #If it's not a directory
+#            if($FileInTargetFolder.Attributes -ne ‘Directory’)
+#            {
+#                #If the file to replace if found
+#                if($FileInTargetFolder.Name -eq $FileInPatchFolder.Name)
+#                {
+#                    #Create Backup Subfolder
+#                    $BackupSubfolder = $BackupFolder + $FileInTargetFolder.Directory.FullName.Replace($TargetFolder, "")
 
-                    if(-Not (Test-Path $BackupSubfolder))
-                    {
-                        New-Item $BackupSubfolder -type directory
-                    }
+#                    if(-Not (Test-Path $BackupSubfolder))
+#                    {
+#                        New-Item $BackupSubfolder -type directory
+#                    }
 
-                    #Create Backup File
-                    Copy-Item $FileInTargetFolder.FullName $BackupSubfolder
+#                    #Create Backup File
+#                    Copy-Item $FileInTargetFolder.FullName $BackupSubfolder
 
-                    #Replace File
-                    Copy-Item $FileInPatchFolder.FullName $FileInTargetFolder.FullName
+#                    #Replace File
+#                    Copy-Item $FileInPatchFolder.FullName $FileInTargetFolder.FullName
 
-                    #Check source and destination file version
-                    if([System.Diagnostics.FileVersionInfo]::GetVersionInfo($FileInPatchFolder.FullName).FileVersion -ne [System.Diagnostics.FileVersionInfo]::GetVersionInfo($FileInTargetFolder.FullName).FileVersion)
-                    {
-                        Write-Error "Source and Destination File Versions do not match"
-                    }
-                }
-            }
-        }
-    }
+#                    #Check source and destination file version
+#                    if([System.Diagnostics.FileVersionInfo]::GetVersionInfo($FileInPatchFolder.FullName).FileVersion -ne [System.Diagnostics.FileVersionInfo]::GetVersionInfo($FileInTargetFolder.FullName).FileVersion)
+#                    {
+#                        Write-Error "Source and Destination File Versions do not match"
+#                    }
+#                }
+#            }
+#        }
+#    }
 
-    Show-SuccessMessage "Files were replaced successfully"
-}
+#    Show-SuccessMessage "Files were replaced successfully"
+#}
 
-Function Create-RemoteFolder
-{
-    param(
-           [parameter(Mandatory=$true)][string] $FolderName,
-           [parameter(Mandatory=$true)][string] $ServerName,
-           [parameter(Mandatory=$true)][System.Management.Automation.PSCredential] $AuthCredentials
-         )
-
-	Invoke-Command -ComputerName $ServerName -authentication credssp -credential $AuthCredentials -scriptblock {
-			
-			param([String]$FolderName)
-		
-            if(-not (Test-Path $FolderName))
-            {
-			    New-Item $FolderName –type directory
-            }
-
-    } -ArgumentList $FolderName
-}
 
 Function Copy-RemoteFolder
 {
@@ -364,4 +345,36 @@ Function Execute-RemoteScript
         Invoke-Expression "$Script $Parameters"
 
         } -ArgumentList $Script, $Parameters
+}
+
+#Creates a NUPKG from files on disk, without needing a .nuspec
+Function Create-NugetPackage
+{
+
+	 param(
+           [parameter(Mandatory=$true)][string] $SourceFolder,
+		   [parameter(Mandatory=$true)][string] $OutputDirectory,
+           [parameter(Mandatory=$true)][string] $PackageVersion,
+		   [parameter(Mandatory=$true)][string] $Id
+         )
+
+	$octoTool = "$Global:CurrentLocation\Tools\Octo.Exe"
+
+	#https://octopus.com/docs/api-and-integration/octo.exe-command-line
+	Invoke-Expression "$octoTool pack --id=$Id --basePath=$SourceFolder --outFolder=$OutputDirectory --version=$PackageVersion --overwrite" 
+}
+
+#Push Nuget packages to feed
+Function Push-NugetPackage
+{
+	param(
+           [parameter(Mandatory=$true)][string] $FeedUrl,
+		   [parameter(Mandatory=$true)][string] $ApiKey,
+           [parameter(Mandatory=$true)][string] $PackageLocation
+         )
+
+	$nugetTool = "$Global:CurrentLocation\Tools\NuGet.Exe"
+
+	#https://docs.microsoft.com/en-us/nuget/tools/cli-ref-push
+	Invoke-Expression "$nugetTool push $PackageLocation -ApiKey $ApiKey -Source $FeedUrl"
 }
