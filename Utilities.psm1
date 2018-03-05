@@ -1,5 +1,6 @@
 $Global:CurrentLocation = Split-Path -Parent -Path $MyInvocation.MyCommand.Definition
 $Global:LogFolder = "$Global:CurrentLocation\Logs"
+$Global:BackupFolder = "$Global:CurrentLocation\Backup"
 
 Function Create-Folder
 {
@@ -36,6 +37,16 @@ Function Show-ErrorMessage
     Write-Log $Message
 }
 
+Function Show-WarningMessage
+{
+    param(
+           [parameter(Mandatory=$true)][string]$Message
+         )
+
+    Write-Host $Message -ForegroundColor Yellow
+    Write-Log $Message
+}
+
 Function Show-SuccessMessage
 {
     param(
@@ -46,53 +57,112 @@ Function Show-SuccessMessage
     Write-Log $Message
 }
 
+Function Show-Message
+{
+    param(
+           [parameter(Mandatory=$true)][string]$Message
+         )
+
+    Write-Host $Message
+    Write-Log $Message
+}
+
 Function Backup-File
 {
-    Param ([parameter(Mandatory=$true)][string]$FileToBackup,
+
+    Param (
+            [parameter(Mandatory=$true)][string]$FileName,
+            [parameter(Mandatory=$true)][string]$TargetFolder
+          )
+
+    $Files = Search-Files -SearchTerm $FileName -Folder $TargetFolder
+
+    foreach($file in $Files)
+    {
+        $DirectoryName=$file.DirectoryName
+        $BackupSubfolder = $DirectoryName.Replace($TargetFolder, $BackupFolder)
+        Create-Folder -FolderName $BackupSubfolder
+        Copy-File -SourceFileLocation $file.FullName -TargetFileLocation $BackupSubfolder
+    }
+
+}
+
+Function Replace-File
+{
+
+    Param (
+            [parameter(Mandatory=$true)][string]$FileName,
+            [parameter(Mandatory=$true)][string]$SourceFolder,
+            [parameter(Mandatory=$true)][string]$TargetFolder
+          )
+
+    $SourceFile = Search-Files -SearchTerm $FileName -Folder $SourceFolder
+    $TargetFiles = Search-Files -SearchTerm $FileName -Folder $TargetFolder
+
+    foreach($TargetFile in $TargetFiles)
+    {
+        Copy-File -SourceFileLocation $SourceFile.FullName -TargetFileLocation $TargetFile
+    }
+
+}
+
+Function Validate-FileByVersion
+{
+
+    Param (
+            [parameter(Mandatory=$true)][string]$FileName,
+            [parameter(Mandatory=$true)][string]$TargetFolder,
+            [parameter(Mandatory=$true)][string]$ExpectedVersion
+          )
+
+    $TargetFiles = Search-Files -SearchTerm $FileName -Folder $TargetFolder
+
+    foreach($TargetFile in $TargetFiles)
+    {
+        Show-Message -Message $TargetFile
+        $FileVersion = [System.Diagnostics.FileVersionInfo]::GetVersionInfo($TargetFile).FileVersion
+        Validate-String -ActualValue $FileVersion -ExpectedValue $ExpectedVersion
+    }
+
+}
+
+Function Search-Files
+{
+    Param (
+            [parameter(Mandatory=$true)][string]$SearchTerm,
+            [parameter(Mandatory=$true)][string]$Folder
+           )
+    
+    return Get-Childitem –Path $Folder -Include $SearchTerm -File -Recurse | Select-Object
+}
+
+Function Rollback-File
+{
+    Param ([parameter(Mandatory=$true)][string]$FileToRestore,
            [parameter(Mandatory=$true)][string]$BackupName,
            [parameter(Mandatory=$true)][string]$BackupFolder)
 
-    Create-Folder -FolderName $BackupFolder
+    #Search for all the backup files using $BackupName
+    $SearchTerm =  "$BackupName*.bak"
+    $FirstBackupFile = Get-Childitem –Path $BackupFolder -Include $SearchTerm -File -Recurse | Select-Object -First 1
 
-    #Initialize variables
-    $timestamp = Get-Date -Format o | foreach {$_ -replace ":", "-"}
+    #Is there any backup?
+    if(($FirstBackupFile.count -gt 0) -and (Test-Path $FirstBackupFile[0]))
+    {
+        #Yes - Restore the latest backup file
+        Show-SuccessMessage "Restoring the latest backup file: $FirstBackupFile";
 
-    #Define Backup Filename
-    $BackupFile = "$BackupFolder\$BackupName.$timestamp.bak";
+        Copy-Item $FirstBackupFile[0] $FileToRestore
 
-    #Backup
-    Copy-Item $FileToBackup $BackupFile
-
-    Show-SuccessMessage "Backup file has been created: $BackupFile"
+        Show-SuccessMessage "Restore successful: $FirstBackupFile"
+    }
+    else
+    {
+        #No - There is no backup file to restore
+        Show-ErrorMessage "$BackupName was not found."
+    }
+    exit
 }
-
-#Function Rollback-File
-#{
-#    Param ([parameter(Mandatory=$true)][string]$FileToRestore,
-#           [parameter(Mandatory=$true)][string]$BackupName,
-#           [parameter(Mandatory=$true)][string]$BackupFolder)
-
-#    #Search for all the backup files using $BackupName
-#    $SearchTerm =  "$BackupName*.bak"
-#    $FirstBackupFile = Get-Childitem –Path $BackupFolder -Include $SearchTerm -File -Recurse | Select-Object -First 1
-
-#    #Is there any backup?
-#    if(($FirstBackupFile.count -gt 0) -and (Test-Path $FirstBackupFile[0]))
-#    {
-#        #Yes - Restore the latest backup file
-#        Show-SuccessMessage "Restoring the latest backup file: $FirstBackupFile";
-
-#        Copy-Item $FirstBackupFile[0] $FileToRestore
-
-#        Show-SuccessMessage "Restore successful: $FirstBackupFile"
-#    }
-#    else
-#    {
-#        #No - There is no backup file to restore
-#        Show-ErrorMessage "$BackupName was not found."
-#    }
-#    exit
-#}
 
 Function Change-AttributeValue
 {
@@ -197,68 +267,13 @@ Function Save-XmlFile
     Show-SuccessMessage "File saved successfully $XmlLocation"
 }
 
-#Function Replace-Files
-#{
-#    param(
-#            [string] $PatchFolder = $Global:CurrentLocation + "\Patch",
-#            [string] $BackupFolder = $Global:BackupFolder,
-#            [parameter(Mandatory=$true)][string] $TargetFolder = "",
-#            [string] $TargetFiles = "*.*"
-#         )
-
-#    #Validate TargetFolder
-#    if(-not (Test-Path $TargetFolder))
-#    {
-#        Show-ErrorMessage "Target folder does not exist"
-#        exit
-#    }
-
-#    if(-Not (Test-Path $BackupFolder))
-#    {
-#        New-Item $BackupFolder -type directory
-#    }
-
-#    #Get all the files
-#    $FilesInTargetFolder = Get-ChildItem -Path $TargetFolder -Filter $TargetFiles -Recurse -Force
-#    $FilesInPatchFolder = Get-ChildItem -Path $PatchFolder -Filter $TargetFiles -Recurse -Force
-
-#    foreach ($FileInPatchFolder in $FilesInPatchFolder) 
-#    {
-#        foreach ($FileInTargetFolder in $FilesInTargetFolder) 
-#        {
-#            #If it's not a directory
-#            if($FileInTargetFolder.Attributes -ne ‘Directory’)
-#            {
-#                #If the file to replace if found
-#                if($FileInTargetFolder.Name -eq $FileInPatchFolder.Name)
-#                {
-#                    #Create Backup Subfolder
-#                    $BackupSubfolder = $BackupFolder + $FileInTargetFolder.Directory.FullName.Replace($TargetFolder, "")
-
-#                    if(-Not (Test-Path $BackupSubfolder))
-#                    {
-#                        New-Item $BackupSubfolder -type directory
-#                    }
-
-#                    #Create Backup File
-#                    Copy-Item $FileInTargetFolder.FullName $BackupSubfolder
-
-#                    #Replace File
-#                    Copy-Item $FileInPatchFolder.FullName $FileInTargetFolder.FullName
-
-#                    #Check source and destination file version
-#                    if([System.Diagnostics.FileVersionInfo]::GetVersionInfo($FileInPatchFolder.FullName).FileVersion -ne [System.Diagnostics.FileVersionInfo]::GetVersionInfo($FileInTargetFolder.FullName).FileVersion)
-#                    {
-#                        Write-Error "Source and Destination File Versions do not match"
-#                    }
-#                }
-#            }
-#        }
-#    }
-
-#    Show-SuccessMessage "Files were replaced successfully"
-#}
-
+Function Copy-File
+{
+    Param([string]$SourceFileLocation, 
+          [string]$TargetFileLocation) 
+    
+	Copy-Item $SourceFileLocation -Destination $TargetFileLocation -Recurse -Force
+}
 
 Function Copy-RemoteFolder
 {
@@ -377,4 +392,32 @@ Function Push-NugetPackage
 
 	#https://docs.microsoft.com/en-us/nuget/tools/cli-ref-push
 	Invoke-Expression "$nugetTool push $PackageLocation -ApiKey $ApiKey -Source $FeedUrl"
+}
+
+Function Stop-IIS
+{
+	iisreset /stop
+}
+
+Function Start-IIS
+{
+	iisreset /start
+}
+
+Function Stop-WindowsService
+{
+    param(
+           [parameter(Mandatory=$true)][string] $DisplayName
+	     )
+
+	Stop-Service -DisplayName  $DisplayName
+}
+
+Function Start-WindowsService
+{
+    param(
+           [parameter(Mandatory=$true)][string] $ServiceName
+	     )
+
+	Start-Service -DisplayName  $ServiceName
 }
