@@ -67,7 +67,7 @@ Function Show-Message
     Write-Log $Message
 }
 
-Function Backup-File
+Function Backup-FileRecurse
 {
 
     Param (
@@ -85,6 +85,25 @@ Function Backup-File
         Copy-File -SourceFileLocation $file.FullName -TargetFileLocation $BackupSubfolder
     }
 
+}
+
+Function Backup-File
+{
+    Param ([parameter(Mandatory=$true)][string]$FileToBackup,
+           [parameter(Mandatory=$true)][string]$BackupName)
+
+    Create-Folder -FolderName $BackupFolder
+
+    #Initialize variables
+    $timestamp = Get-Date -Format o | foreach {$_ -replace ":", "-"}
+
+    #Define Backup Filename
+    $BackupFile = "$BackupFolder\$BackupName.$timestamp.bak";
+
+    #Backup
+    Copy-Item $FileToBackup $BackupFile
+
+    Show-SuccessMessage "Backup file has been created: $BackupFile"
 }
 
 Function Replace-File
@@ -136,7 +155,7 @@ Function Search-Files
     return Get-Childitem –Path $Folder -Include $SearchTerm -File -Recurse | Select-Object
 }
 
-Function Rollback-File
+Function Rollback-FileRecurse
 {
     Param (
             [parameter(Mandatory=$true)][string]$FileName,
@@ -152,6 +171,34 @@ Function Rollback-File
         $TargetSubfolder = $DirectoryName.Replace($BackupFolder, $TargetFolder)
         Copy-File -SourceFileLocation $BackupFile.FullName -TargetFileLocation $TargetSubfolder
     }
+}
+
+Function Rollback-File
+{
+    Param ([parameter(Mandatory=$true)][string]$FileToRestore,
+           [parameter(Mandatory=$true)][string]$BackupName,
+           [parameter(Mandatory=$true)][string]$BackupFolder)
+
+    #Search for all the backup files using $BackupName
+    $SearchTerm =  "$BackupName*.bak"
+    $FirstBackupFile = Get-Childitem –Path $BackupFolder -Include $SearchTerm -File -Recurse | Select-Object -First 1
+
+    #Is there any backup?
+    if(($FirstBackupFile.count -gt 0) -and (Test-Path $FirstBackupFile[0]))
+    {
+        #Yes - Restore the latest backup file
+        Show-SuccessMessage "Restoring the latest backup file: $FirstBackupFile";
+
+        Copy-Item $FirstBackupFile[0] $FileToRestore
+
+        Show-SuccessMessage "Restore successful: $FirstBackupFile"
+    }
+    else
+    {
+        #No - There is no backup file to restore
+        Show-ErrorMessage "$BackupName was not found."
+    }
+    exit
 }
 
 Function Change-AttributeValue
