@@ -138,30 +138,20 @@ Function Search-Files
 
 Function Rollback-File
 {
-    Param ([parameter(Mandatory=$true)][string]$FileToRestore,
-           [parameter(Mandatory=$true)][string]$BackupName,
-           [parameter(Mandatory=$true)][string]$BackupFolder)
+    Param (
+            [parameter(Mandatory=$true)][string]$FileName,
+            [parameter(Mandatory=$true)][string]$TargetFolder
+          )
 
-    #Search for all the backup files using $BackupName
-    $SearchTerm =  "$BackupName*.bak"
-    $FirstBackupFile = Get-Childitem –Path $BackupFolder -Include $SearchTerm -File -Recurse | Select-Object -First 1
+    #Search for all the backup files using $FileName
+    $BackupFiles = Get-Childitem –Path $BackupFolder -Include $FileName -File -Recurse | Select-Object
 
-    #Is there any backup?
-    if(($FirstBackupFile.count -gt 0) -and (Test-Path $FirstBackupFile[0]))
+    foreach($BackupFile in $BackupFiles)
     {
-        #Yes - Restore the latest backup file
-        Show-SuccessMessage "Restoring the latest backup file: $FirstBackupFile";
-
-        Copy-Item $FirstBackupFile[0] $FileToRestore
-
-        Show-SuccessMessage "Restore successful: $FirstBackupFile"
+        $DirectoryName=$BackupFile.DirectoryName
+        $TargetSubfolder = $DirectoryName.Replace($BackupFolder, $TargetFolder)
+        Copy-File -SourceFileLocation $BackupFile.FullName -TargetFileLocation $TargetSubfolder
     }
-    else
-    {
-        #No - There is no backup file to restore
-        Show-ErrorMessage "$BackupName was not found."
-    }
-    exit
 }
 
 Function Change-AttributeValue
